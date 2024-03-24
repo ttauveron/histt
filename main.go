@@ -5,12 +5,54 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/textinput"
 	"os"
+	"regexp"
 	"strings"
 	"unsafe"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/sys/unix"
 )
+
+const headerSize = 6
+
+type Mode int
+
+const (
+	ExactMatching Mode = iota
+	Keywords
+	Regex
+)
+
+func (m Mode) String() string {
+	switch m {
+	case ExactMatching:
+		return "exact"
+	case Keywords:
+		return "keywords"
+	case Regex:
+		return "regex"
+	default:
+		return "unknown"
+	}
+}
+
+type TextCase int
+
+const (
+	Insensitive TextCase = iota
+	Sensitive
+)
+
+func (c TextCase) String() string {
+	switch c {
+	case Insensitive:
+		return "insensitive"
+	case Sensitive:
+		return "sensitive"
+	default:
+		return "unknown"
+	}
+}
 
 type model struct {
 	commands    []string // All commands from history
@@ -23,6 +65,8 @@ type model struct {
 	textInput   textinput.Model
 	width       int
 	height      int
+	mode        Mode
+	textCase    TextCase
 }
 
 func initialModel() model {
@@ -33,7 +77,7 @@ func initialModel() model {
 	ti.CharLimit = 10000
 
 	// Assuming we want to display 10 commands at a time
-	displaySize := 10
+	displaySize := 20
 
 	history, _ := readHistory(os.Getenv("HOME") + "/.bash_history")
 	return model{
@@ -111,10 +155,45 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m *model) filterCommands() {
-	query := strings.ToLower(m.query)
+	var query string
+	if m.textCase == Insensitive {
+		query = strings.ToLower(m.query)
+	} else {
+		query = m.query
+	}
+
 	var filtered []string
 	for _, cmd := range m.commands {
-		if strings.Contains(strings.ToLower(cmd), query) {
+		var cmdTextSearch string
+		if m.textCase == Insensitive {
+			cmdTextSearch = strings.ToLower(cmd) // Convert to lowercase for case-insensitive comparison.
+		} else {
+			cmdTextSearch = cmd
+		}
+
+		switch m.mode {
+		case ExactMatching:
+			if strings.HasPrefix(cmdTextSearch, query) {
+				filtered = append(filtered, cmd)
+			}
+		case Keywords:
+			matches := true
+			for _, word := range strings.Split(query, " ") {
+				if !strings.Contains(cmdTextSearch, word) {
+					matches = false
+					break
+				}
+			}
+			if matches {
+				filtered = append(filtered, cmd)
+			}
+		case Regex:
+			matched, err := regexp.MatchString(query, cmdTextSearch)
+			if err == nil && matched {
+				filtered = append(filtered, cmd)
+			}
+
+		default:
 			filtered = append(filtered, cmd)
 		}
 	}
@@ -122,7 +201,7 @@ func (m *model) filterCommands() {
 	// Reset view and selection
 	m.viewStart = 0
 	m.selected = 0
-	m.viewEnd = m.displaySize
+	m.viewEnd = m.height - headerSize
 	if m.viewEnd > len(m.filtered) {
 		m.viewEnd = len(m.filtered)
 	}
@@ -130,6 +209,8 @@ func (m *model) filterCommands() {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
+	var cmd tea.Cmd
+	m.textInput, cmd = m.textInput.Update(msg)
 	switch msg := msg.(type) {
 
 	case tea.KeyMsg:
@@ -157,6 +238,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// fillTerminalInput(m.commands[m.selected],true)
 			return m, tea.Quit
 
+		case tea.KeyCtrlE:
+			m.switchMode()
+			m.query = m.textInput.Value()
+			m.filterCommands()
+			//return m, nil
+
+		case tea.KeyCtrlT:
+			m.switchCase()
+			m.query = m.textInput.Value()
+			m.filterCommands()
+			//return m, nil
+
 		default:
 			m.query = m.textInput.Value()
 			m.filterCommands()
@@ -165,11 +258,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+
+		m.viewEnd = m.height - headerSize
 	}
 
-	var cmd tea.Cmd
-	m.textInput, cmd = m.textInput.Update(msg)
 	return m, cmd
+}
+
+func (m *model) switchMode() {
+	m.mode = (m.mode + 1) % 3
+}
+
+func (m *model) switchCase() {
+	m.textCase = (m.textCase + 1) % 2
 }
 
 func fitStringToWidth(s string, width int) string {
@@ -180,10 +281,12 @@ func fitStringToWidth(s string, width int) string {
 	partLength := (width - 3) / 2 // Subtract 3 for the ellipsis and divide by 2 for two parts.
 	return s[:partLength] + "..." + s[len(s)-partLength:]
 }
+
 func (m model) View() string {
 
 	var b strings.Builder
 	b.WriteString(m.textInput.View())
+	b.WriteString(fmt.Sprintf("\n- HISTORY - match:%s (C-e) - case:%s (C-t)", m.mode, m.textCase))
 	b.WriteString("\n\n")
 
 	displayEnd := min(m.viewEnd, len(m.filtered))
