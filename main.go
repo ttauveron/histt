@@ -21,6 +21,8 @@ type model struct {
 	viewEnd     int      // Index in `filtered` where the view ends
 	displaySize int      // Number of commands to display at a time
 	textInput   textinput.Model
+	width       int
+	height      int
 }
 
 func initialModel() model {
@@ -28,8 +30,7 @@ func initialModel() model {
 	ti.Placeholder = "Command..."
 	ti.Focus()
 	ti.Prompt = ">> "
-	ti.CharLimit = 156
-	ti.Width = 20
+	ti.CharLimit = 10000
 
 	// Assuming we want to display 10 commands at a time
 	displaySize := 10
@@ -128,7 +129,6 @@ func (m *model) filterCommands() {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 
@@ -156,21 +156,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyTab:
 			// fillTerminalInput(m.commands[m.selected],true)
 			return m, tea.Quit
+
+		default:
+			m.query = m.textInput.Value()
+			m.filterCommands()
 		}
 
-		//default:
-		//	if !m.textarea.Focused() {
-		//		cmd = m.textarea.Focus()
-		//		cmds = append(cmds, cmd)
-		//	}
-		// Handle more keys and messages here
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 	}
 
+	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
 	return m, cmd
 }
 
+func fitStringToWidth(s string, width int) string {
+	if len(s) <= width || width < 10 {
+		return s
+	}
+
+	partLength := (width - 3) / 2 // Subtract 3 for the ellipsis and divide by 2 for two parts.
+	return s[:partLength] + "..." + s[len(s)-partLength:]
+}
 func (m model) View() string {
+
 	var b strings.Builder
 	b.WriteString(m.textInput.View())
 	b.WriteString("\n\n")
@@ -181,7 +192,9 @@ func (m model) View() string {
 		if m.viewStart+i == m.selected {
 			cursor = ">"
 		}
-		b.WriteString(fmt.Sprintf("%s %s\n", cursor, cmd))
+
+		cmdDisplay := fitStringToWidth(cmd, m.width-2)
+		b.WriteString(fmt.Sprintf("%s %s\n", cursor, cmdDisplay))
 	}
 
 	b.WriteString("\nPress q to quit.\n")
@@ -206,7 +219,7 @@ func main() {
 
 	// Assert the finalModel back to your specific model type to access its fields.
 	if m, ok := finalModel.(model); ok {
-		fillTerminalInput(m.commands[m.selected], true)
+		fillTerminalInput(m.filtered[m.selected], true)
 	} else {
 		fmt.Println("Could not retrieve the final model.")
 	}
