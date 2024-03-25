@@ -129,6 +129,18 @@ func removeDuplicates(elements []string) []string {
 	return result
 }
 
+func removeComments(elements []string) []string {
+	var result []string
+
+	for _, element := range elements {
+		if !strings.HasPrefix(element, "#") {
+			result = append(result, element)
+		}
+	}
+
+	return result
+}
+
 func readHistory(filePath string) ([]string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -147,7 +159,8 @@ func readHistory(filePath string) ([]string, error) {
 		commands[i], commands[j] = commands[j], commands[i]
 	}
 
-	return removeDuplicates(commands), scanner.Err()
+	results := removeComments(commands)
+	return removeDuplicates(results), scanner.Err()
 }
 
 func (m model) Init() tea.Cmd {
