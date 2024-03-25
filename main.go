@@ -16,8 +16,8 @@ import (
 
 var (
 	highlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
-	normalStyle  = lipgloss.NewStyle()
-	headerStyle  = lipgloss.NewStyle().
+	normalStyle    = lipgloss.NewStyle()
+	headerStyle    = lipgloss.NewStyle().
 			Background(lipgloss.Color("#6b0582")).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(false).
@@ -67,18 +67,19 @@ func (c TextCase) String() string {
 }
 
 type model struct {
-	commands    []string // All commands from history
-	filtered    []string // Filtered commands based on query
-	query       string   // Current user input for filtering
-	selected    int      // Currently selected command index
-	viewStart   int      // Index in `filtered` where the view starts
-	viewEnd     int      // Index in `filtered` where the view ends
-	displaySize int      // Number of commands to display at a time
-	textInput   textinput.Model
-	width       int
-	height      int
-	mode        Mode
-	textCase    TextCase
+	commands        []string // All commands from history
+	filtered        []string // Filtered commands based on query
+	query           string   // Current user input for filtering
+	selected        int      // Currently selected command index
+	viewStart       int      // Index in `filtered` where the view starts
+	viewEnd         int      // Index in `filtered` where the view ends
+	displaySize     int      // Number of commands to display at a time
+	textInput       textinput.Model
+	width           int
+	height          int
+	injectSelection bool
+	mode            Mode
+	textCase        TextCase
 }
 
 func initialModel() model {
@@ -93,13 +94,14 @@ func initialModel() model {
 
 	history, _ := readHistory(os.Getenv("HOME") + "/.bash_history")
 	return model{
-		commands:    history,
-		filtered:    history,
-		selected:    0,
-		viewStart:   0,
-		viewEnd:     displaySize,
-		displaySize: displaySize,
-		textInput:   ti,
+		commands:        history,
+		filtered:        history,
+		selected:        0,
+		viewStart:       0,
+		viewEnd:         displaySize,
+		displaySize:     displaySize,
+		textInput:       ti,
+		injectSelection: false,
 	}
 }
 
@@ -261,6 +263,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyTab:
 			// fillTerminalInput(m.commands[m.selected],true)
+			m.injectSelection = true
 			return m, tea.Quit
 
 		case tea.KeyCtrlE:
@@ -409,9 +412,7 @@ func main() {
 	}
 
 	// Assert the finalModel back to your specific model type to access its fields.
-	if m, ok := finalModel.(model); ok {
+	if m, ok := finalModel.(model); ok && m.injectSelection {
 		fillTerminalInput(m.filtered[m.selected], true)
-	} else {
-		fmt.Println("Could not retrieve the final model.")
 	}
 }
