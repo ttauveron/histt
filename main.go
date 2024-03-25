@@ -10,7 +10,19 @@ import (
 	"unsafe"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/sys/unix"
+)
+
+var (
+	highlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
+	normalStyle  = lipgloss.NewStyle()
+	headerStyle  = lipgloss.NewStyle().
+			Background(lipgloss.Color("#6b0582")).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Bold(false).
+			PaddingLeft(1).
+			PaddingRight(1)
 )
 
 const headerSize = 4
@@ -71,9 +83,9 @@ type model struct {
 
 func initialModel() model {
 	ti := textinput.New()
-	ti.Placeholder = "Command..."
+	ti.Placeholder = "Filter..."
 	ti.Focus()
-	ti.Prompt = ">> "
+	ti.Prompt = "$ "
 	ti.CharLimit = 10000
 
 	// Assuming we want to display 10 commands at a time
@@ -295,12 +307,77 @@ func fitStringToWidth(s string, width int) string {
 	return s[:partLength] + "..." + s[len(s)-partLength:]
 }
 
+// highlightMatches applies styling to parts of the command that match the query
+func (m *model) highlightMatches(cmd string) string {
+	var result string
+	cmdLower := strings.ToLower(cmd)
+	queryLower := strings.ToLower(m.query)
+
+	switch m.mode {
+	case ExactMatching:
+		// Check if the command starts with the query, excluding trailing spaces in the query
+		trimmedQuery := strings.TrimSpace(queryLower)
+		if strings.HasPrefix(cmdLower, trimmedQuery) {
+			// Apply highlight to the matching part, excluding trailing spaces in the command
+			matchEnd := len(trimmedQuery)
+			highlighted := lipgloss.JoinHorizontal(lipgloss.Top,
+				highlightStyle.Render(cmd[:matchEnd]),
+				normalStyle.Render(cmd[matchEnd:]),
+			)
+			result = highlighted
+		} else {
+			result = cmd
+		}
+
+	case Keywords:
+		// Split the query into words, ignoring extra spaces
+		words := strings.Fields(queryLower) // Fields uses spaces as separators and ignores extra spaces
+		highlightedCmd := cmd
+		for _, word := range words {
+			re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(word))
+			highlightedCmd = re.ReplaceAllStringFunc(highlightedCmd, func(match string) string {
+				return highlightStyle.Render(match)
+			})
+		}
+		result = highlightedCmd
+
+	case Regex:
+		re, err := regexp.Compile("(?i)" + m.query)
+		if err == nil {
+			highlightedCmd := re.ReplaceAllStringFunc(cmd, func(match string) string {
+				return highlightStyle.Render(match)
+			})
+			result = highlightedCmd
+		} else {
+			result = cmd // If regex is invalid, display the command unmodified
+		}
+	default:
+		result = cmd // Default case to handle unstyled commands
+	}
+
+	// Ensures that styling is not applied to trailing spaces or if the query is only spaces
+	if strings.TrimSpace(m.query) == "" {
+		return normalStyle.Render(cmd)
+	}
+
+	return result
+}
+
 func (m model) View() string {
 
 	var b strings.Builder
 	b.WriteString(m.textInput.View())
-	b.WriteString(fmt.Sprintf("\n- HISTORY - match:%s (C-e) - case:%s (C-t)", m.mode, m.textCase))
-	b.WriteString("\n\n")
+	b.WriteString("\nType to filter, UP/DOWN move, RET/TAB select\n")
+	headerText := fmt.Sprintf("- HISTORY - match:%s (C-e) - case:%s (C-t)", m.mode, m.textCase)
+	styledHeaderLength := lipgloss.Width(headerStyle.Render(headerText))
+	remainingWidth := m.width - styledHeaderLength
+	if remainingWidth > 0 {
+		// Generate the dashed line to fill the remaining width
+		dashLine := strings.Repeat("-", remainingWidth-1)
+		headerText += " " + dashLine
+	}
+	b.WriteString(headerStyle.Render(headerText))
+	b.WriteString("\n")
 
 	displayEnd := min(m.viewEnd, len(m.filtered))
 	for i, cmd := range m.filtered[m.viewStart:displayEnd] {
@@ -310,7 +387,7 @@ func (m model) View() string {
 		}
 
 		cmdDisplay := fitStringToWidth(cmd, m.width-2)
-		b.WriteString(fmt.Sprintf("%s %s\n", cursor, cmdDisplay))
+		b.WriteString(fmt.Sprintf("%s %s\n", cursor, m.highlightMatches(cmdDisplay)))
 	}
 	return b.String()
 }
