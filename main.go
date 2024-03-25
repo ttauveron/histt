@@ -78,6 +78,7 @@ type model struct {
 	width           int
 	height          int
 	injectSelection bool
+	runSelection    bool
 	mode            Mode
 	textCase        TextCase
 }
@@ -102,6 +103,7 @@ func initialModel() model {
 		displaySize:     displaySize,
 		textInput:       ti,
 		injectSelection: false,
+		runSelection:    false,
 	}
 }
 
@@ -262,8 +264,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyTab:
-			// fillTerminalInput(m.commands[m.selected],true)
 			m.injectSelection = true
+			return m, tea.Quit
+
+		case tea.KeyEnter:
+			m.injectSelection = true
+			m.runSelection = true
 			return m, tea.Quit
 
 		case tea.KeyCtrlE:
@@ -413,6 +419,10 @@ func main() {
 
 	// Assert the finalModel back to your specific model type to access its fields.
 	if m, ok := finalModel.(model); ok && m.injectSelection {
-		fillTerminalInput(m.filtered[m.selected], true)
+		selection := m.filtered[m.selected]
+		if m.runSelection {
+			selection += "\n"
+		}
+		fillTerminalInput(selection, true)
 	}
 }
