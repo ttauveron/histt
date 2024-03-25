@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const headerSize = 6
+const headerSize = 4
 
 type Mode int
 
@@ -312,8 +312,6 @@ func (m model) View() string {
 		cmdDisplay := fitStringToWidth(cmd, m.width-2)
 		b.WriteString(fmt.Sprintf("%s %s\n", cursor, cmdDisplay))
 	}
-
-	b.WriteString("\nPress q to quit.\n")
 	return b.String()
 }
 
