@@ -83,6 +83,14 @@ type model struct {
 	textCase        TextCase
 }
 
+func getHistoryLocation() string {
+	historyLocation := os.Getenv("HISTORY_LOCATION")
+	if historyLocation == "" {
+		historyLocation = os.Getenv("HOME") + "/.bash_history"
+	}
+	return historyLocation
+}
+
 func initialModel() model {
 	ti := textinput.New()
 	ti.Placeholder = "Filter..."
@@ -93,7 +101,7 @@ func initialModel() model {
 	// Assuming we want to display 10 commands at a time
 	displaySize := 20
 
-	history, _ := readHistory(os.Getenv("HOME") + "/.bash_history")
+	history, _ := readHistory(getHistoryLocation())
 	return model{
 		commands:        history,
 		filtered:        history,
