@@ -3,6 +3,8 @@
 This project is a basic reimplementation of https://github.com/dvorka/hstr in Go.
 It provides an easy and flexible way to work with command line history. With support for customizable history file locations and enhanced search capabilities, it streamlines the process of finding and managing past commands.
 
+![image](https://github.com/ttauveron/histt/assets/1558361/cf4ef52f-8005-4a30-8d9b-bc267bcd2445)
+
 ## Features
 
 - *Customizable History File Location*: Set the history file location using the HISTORY_LOCATION environment variable, or rely on the default location at ~/.bash_history.
