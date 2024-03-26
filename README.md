@@ -3,7 +3,7 @@
 This project is a basic reimplementation of https://github.com/dvorka/hstr in Go.
 It provides an easy and flexible way to work with command line history. With support for customizable history file locations and enhanced search capabilities, it streamlines the process of finding and managing past commands.
 
-![image](https://github.com/ttauveron/histt/assets/1558361/cf4ef52f-8005-4a30-8d9b-bc267bcd2445)
+![image](https://github.com/ttauveron/histt/assets/1558361/7fcbcfcc-2c52-4d6a-b077-894cfd50f952)
 
 ## Features
 
