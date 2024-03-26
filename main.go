@@ -16,13 +16,14 @@ import (
 
 var (
 	highlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
-	normalStyle    = lipgloss.NewStyle()
+	normalStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF"))
 	headerStyle    = lipgloss.NewStyle().
 			Background(lipgloss.Color("#6b0582")).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(false).
 			PaddingLeft(1).
 			PaddingRight(1)
+	selectedStyle = lipgloss.NewStyle().Background(lipgloss.Color("#1C0023")).Foreground(lipgloss.Color("#CC00FF"))
 )
 
 const headerSize = 4
@@ -398,13 +399,15 @@ func (m model) View() string {
 
 	displayEnd := min(m.viewEnd, len(m.filtered))
 	for i, cmd := range m.filtered[m.viewStart:displayEnd] {
-		cursor := " " // Not selected
-		if m.viewStart+i == m.selected {
-			cursor = ">"
-		}
-
+		isSelected := m.viewStart+i == m.selected
 		cmdDisplay := fitStringToWidth(cmd, m.width-2)
-		b.WriteString(fmt.Sprintf("%s %s\n", cursor, m.highlightMatches(cmdDisplay)))
+
+		if isSelected {
+			b.WriteString(selectedStyle.Width(m.width).Render(" "+cmdDisplay) + "\n")
+		} else {
+			highlightedCmd := m.highlightMatches(cmdDisplay)
+			b.WriteString(normalStyle.Render(" "+highlightedCmd) + "\n")
+		}
 	}
 	return b.String()
 }
