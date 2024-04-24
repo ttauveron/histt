@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/charmbracelet/bubbles/textinput"
 	"os"
 	"regexp"
 	"strings"
 	"unsafe"
+
+	"github.com/charmbracelet/bubbles/textinput"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -92,20 +93,21 @@ func getHistoryLocation() string {
 	return historyLocation
 }
 
-func initialModel() model {
+func initialModel(initialQuery string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Filter..."
 	ti.Focus()
 	ti.Prompt = "$ "
 	ti.CharLimit = 10000
+	ti.SetValue(initialQuery)
 
 	// Assuming we want to display 10 commands at a time
 	displaySize := 20
 
 	history, _ := readHistory(getHistoryLocation())
-	return model{
+	m := model{
 		commands:        history,
-		filtered:        history,
+		filtered:        []string{},
 		selected:        0,
 		viewStart:       0,
 		viewEnd:         displaySize,
@@ -114,6 +116,9 @@ func initialModel() model {
 		injectSelection: false,
 		runSelection:    false,
 	}
+	m.query = initialQuery
+	m.filterCommands()
+	return m
 }
 
 func fillTerminalInput(cmd string, padding bool) {
@@ -398,8 +403,9 @@ func (m model) View() string {
 	b.WriteString("\n")
 
 	displayEnd := min(m.viewEnd, len(m.filtered))
-	for i, cmd := range m.filtered[m.viewStart:displayEnd] {
-		isSelected := m.viewStart+i == m.selected
+	for i := m.viewStart; i < displayEnd; i++ {
+		cmd := m.filtered[i]
+		isSelected := i == m.selected
 		cmdDisplay := fitStringToWidth(cmd, m.width-2)
 
 		if isSelected {
@@ -420,7 +426,11 @@ func min(a, b int) int {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	var initialQuery string
+	if len(os.Args) > 1 {
+		initialQuery = strings.Join(os.Args[2:], " ") // Assuming os.Args[1] is '--'
+	}
+	p := tea.NewProgram(initialModel(initialQuery), tea.WithAltScreen())
 
 	finalModel, err := p.Run()
 	if err != nil {
